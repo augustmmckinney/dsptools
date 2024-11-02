@@ -1,0 +1,13 @@
+dsp functions
+
+wavetable-lookup
+convolution
+digital filtering
+waveguides
+
+utility functions
+
+header file for audio file data structs
+wave in
+wave out
+file format conversion
