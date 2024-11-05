@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 struct wav_data {	
 	int16_t audio_format, channels, block_align, bit_depth;
@@ -11,91 +12,233 @@ int main() {
 
 	struct wav_data data;
 	FILE* fptr;
-	char filepath[100];
+	char filepath[256];
 	char buffer[5];
 
 	// retrieve path to input file, open file
 	printf("full path to input file: ");
-	scanf("%s", filepath);
+	if (scanf("%s", filepath) != 1) {
+		perror("error");
+		return 1;
+	}
 	fptr = fopen(filepath, "rb");
 	if (fptr == NULL) {
-		printf("exiting, the file has not opened successfully\n");
-		fclose(fptr);
-		exit(1);
+		perror("error");
+		return 1;
 	}
 
 	// check RIFF header
-	fseek(fptr, 0, SEEK_SET);
-	fread(buffer, sizeof(char), 4, fptr);
+	if (fseek(fptr, 0, SEEK_SET) != 0) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
+	if (fread(buffer, sizeof(char), 4, fptr) != 4) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
 	buffer[4] = '\0';
 	if (strcmp("RIFF", buffer) != 0) {
 		printf("exiting, this file is not an RIFF file\n");
-		fclose(fptr);
-		exit(1);
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
 	}
 
 	// check ChunkSize
-	fread(&data.chunk_size, sizeof(int32_t), 1, fptr);
+	if (fread(&data.chunk_size, sizeof(int32_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
 	
 	// check if the file is a WAV
-	fread(buffer, sizeof(char), 4, fptr);
+	if (fread(buffer, sizeof(char), 4, fptr) != 4) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
 	if (strcmp("WAVE", buffer) != 0) {
 		printf("exiting, this file is not a wave file\n");
-		fclose(fptr);
-		exit(1);
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
 	}
 
-	// check subchunk ID, search for "fmt " subchunk
-	fread(buffer, sizeof(char), 4, fptr);
-	while (strcmp("fmt ", buffer) != 0) {
-		fread(&data.subchunk_size, sizeof(int32_t), 1, fptr);
-		fseek(fptr, data.subchunk_size, SEEK_CUR);
-		fread(buffer, sizeof(char), 4, fptr);
+	// check subchunk ID, search for "fmt " subchunk	
+	while (1) {
+		if (fread(buffer, sizeof(char), 4, fptr) != 4) {
+			perror("error");
+			if (fclose(fptr) != 0) {
+				perror("error");
+				return 1;
+			}
+			return 1;
+		}
+		if (strcmp("fmt ", buffer) == 0) {
+			break;
+		}
+		if (fread(&data.subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
+			perror("error");
+			if (fclose(fptr) != 0) {
+				perror("error");
+				return 1;
+			}	
+			return 1;
+		}
+		if (fseek(fptr, data.subchunk_size, SEEK_CUR) != 0) {
+			perror("error");
+			if (fclose(fptr) != 0) {
+				perror("error");
+				return 1;
+			}
+			return 1;
+		}
+		
 	}
 
 	// fmt subchunk size
-	fread(&data.subchunk_size, sizeof(int32_t), 1, fptr);
+	if (fread(&data.subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
 
 	// audio format (1 for pcm, anything else is compressed)
-	fread(&data.audio_format, sizeof(int16_t), 1, fptr);
+	if (fread(&data.audio_format, sizeof(int16_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
 
 	// number of channels
-	fread(&data.channels, sizeof(int16_t), 1, fptr);
-	
-	// sample rate
-	fread(&data.sample_rate, sizeof(int32_t), 1, fptr);
-	
-	// byte rate
-	fread(&data.byte_rate, sizeof(int32_t), 1, fptr);
-	
-	// block align (number of bytes per sample including all channels)
-	fread(&data.block_align, sizeof(int16_t), 1, fptr);
-	
-	// bit depth
-	fread(&data.bit_depth, sizeof(int16_t), 1, fptr);
-
-	// check for extra parameters
-
-	// check subchunk ID, search for "data" subchunk
-	fread(buffer, sizeof(char), 4, fptr);
-	while (strcmp("data", buffer) != 0) {
-		fread(&data.subchunk_size, sizeof(int32_t), 1, fptr);
-		fseek(fptr, data.subchunk_size, SEEK_CUR);
-		fread(buffer, sizeof(char), 4, fptr);
+	if (fread(&data.channels, sizeof(int16_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
 	}
 	
-	// number of sample
-	fread(&data.samples, sizeof(int32_t), 1, fptr);
+	// sample rate
+	if (fread(&data.sample_rate, sizeof(int32_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
+	
+	// byte rate
+	if (fread(&data.byte_rate, sizeof(int32_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
 
-	printf("%s\n", buffer);
-	printf("%d\n", data.subchunk_size);
-	printf("%d\n", data.audio_format);
-	printf("%d\n", data.channels);
-	printf("%d\n", data.sample_rate);
-	printf("%d\n", data.byte_rate);
-	printf("%d\n", data.block_align);
-	printf("%d\n", data.bit_depth);
-	printf("%d\n", data.samples);
+	// block align (number of bytes per sample including all channels)
+	if (fread(&data.block_align, sizeof(int16_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
+	
+	// bit depth
+	if (fread(&data.bit_depth, sizeof(int16_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
+
+	// check subchunk ID, search for "data" subchunk	
+	while (1) {
+		if (fread(buffer, sizeof(char), 4, fptr) != 4) {
+			perror("error");
+			if (fclose(fptr) != 0) {
+				perror("error");
+				return 1;
+			}
+			return 1;
+		}
+		if (strcmp("data", buffer) == 0) {
+			break;
+		}
+		if (fread(&data.subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
+			perror("error");
+			if (fclose(fptr) != 0) {
+				perror("error");
+				return 1;
+			}
+			return 1;
+		}
+		if (fseek(fptr, data.subchunk_size, SEEK_CUR) != 0) {
+			perror("error");
+			if (fclose(fptr) != 0) {
+				perror("error");
+				return 1;
+			}
+			return 1;
+		}
+	}
+	
+	// number of samples
+	if (fread(&data.samples, sizeof(int32_t), 1, fptr) != 1) {
+		perror("error");
+		if (fclose(fptr) != 0) {
+			perror("error");
+			return 1;
+		}
+		return 1;
+	}
+	
+	// close file
+	if (fclose(fptr) != 0) {
+		perror("error");
+		return 1;
+	}
+
+	// return wav_data struct
+	printf("audio format: %d\n", data.audio_format);
+	printf("# of channels: %d\n", data.channels);
+	printf("sample rate: %d\n", data.sample_rate);
+	printf("byte rate: %d\n", data.byte_rate);
+	printf("block align: %d\n", data.block_align);
+	printf("bit depth: %d\n", data.bit_depth);
+	printf("# of samples: %d\n", data.samples);
 
 	return 0;
 }
