@@ -1,18 +1,18 @@
 dsp functions
 
+digital filter
 wavetable-lookup
 convolution
-digital filtering
 waveguides
 
 utility functions
 
 header file for audio file data structs
-wave in
-wave out
 file format conversion
 
 TODO
 
-error handling for wave in
+error handling scheme
+account for endianess
 figure out how to negate spaces in input file name
+figure out how to account for samplerate/bit depth

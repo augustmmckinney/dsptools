@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "../include/wavin.h"
+#include "../include/wav_read.h"
+#include "../include/wav_data.h"
 
-struct wav_data wavin(char* filepath) {
+struct wav_data wav_read(char* filepath) {
 
 	struct wav_data data;
 	FILE* fptr;
@@ -44,7 +45,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 
-	// check ChunkSize
+	// read ChunkSize
 	if (fread(&data.chunk_size, sizeof(int32_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -85,7 +86,7 @@ struct wav_data wavin(char* filepath) {
 		if (strcmp("fmt ", buffer) == 0) {
 			break;
 		}
-		if (fread(&data.subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
+		if (fread(&data.fmt_subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
 			perror("error");
 			if (fclose(fptr) != 0) {
 				perror("error");
@@ -93,7 +94,7 @@ struct wav_data wavin(char* filepath) {
 			}	
 			return data;
 		}
-		if (fseek(fptr, data.subchunk_size, SEEK_CUR) != 0) {
+		if (fseek(fptr, data.fmt_subchunk_size, SEEK_CUR) != 0) {
 			perror("error");
 			if (fclose(fptr) != 0) {
 				perror("error");
@@ -104,8 +105,8 @@ struct wav_data wavin(char* filepath) {
 		
 	}
 
-	// fmt subchunk size
-	if (fread(&data.subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
+	// read fmt subchunk size
+	if (fread(&data.fmt_subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
 			perror("error");
@@ -114,7 +115,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 
-	// audio format (1 for pcm, anything else is compressed)
+	// read audio format (1 for pcm, anything else is compressed)
 	if (fread(&data.audio_format, sizeof(int16_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -124,7 +125,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 
-	// number of channels
+	// read number of channels
 	if (fread(&data.channels, sizeof(int16_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -134,7 +135,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 	
-	// sample rate
+	// read sample rate
 	if (fread(&data.sample_rate, sizeof(int32_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -144,7 +145,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 	
-	// byte rate
+	// read byte rate
 	if (fread(&data.byte_rate, sizeof(int32_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -154,7 +155,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 
-	// block align (number of bytes per sample including all channels)
+	// read block align (number of bytes per sample including all channels)
 	if (fread(&data.block_align, sizeof(int16_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -164,7 +165,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 	
-	// bit depth
+	// read bit depth
 	if (fread(&data.bit_depth, sizeof(int16_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
@@ -174,7 +175,7 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 
-	// check subchunk ID, search for "data" subchunk	
+	// read check subchunk ID, search for "data" subchunk	
 	while (1) {
 		if (fread(buffer, sizeof(char), 4, fptr) != 4) {
 			perror("error");
@@ -187,7 +188,7 @@ struct wav_data wavin(char* filepath) {
 		if (strcmp("data", buffer) == 0) {
 			break;
 		}
-		if (fread(&data.subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
+		if (fread(&data.data_subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
 			perror("error");
 			if (fclose(fptr) != 0) {
 				perror("error");
@@ -195,7 +196,7 @@ struct wav_data wavin(char* filepath) {
 			}
 			return data;
 		}
-		if (fseek(fptr, data.subchunk_size, SEEK_CUR) != 0) {
+		if (fseek(fptr, data.data_subchunk_size, SEEK_CUR) != 0) {
 			perror("error");
 			if (fclose(fptr) != 0) {
 				perror("error");
@@ -205,8 +206,8 @@ struct wav_data wavin(char* filepath) {
 		}
 	}
 	
-	// number of samples
-	if (fread(&data.samples, sizeof(int32_t), 1, fptr) != 1) {
+	// read number of bytes in the audio data
+	if (fread(&data.data_subchunk_size, sizeof(int32_t), 1, fptr) != 1) {
 		perror("error");
 		if (fclose(fptr) != 0) {
 			perror("error");
@@ -215,6 +216,10 @@ struct wav_data wavin(char* filepath) {
 		return data;
 	}
 	
+	// read audio data
+	data.data = (int8_t*)malloc(data.data_subchunk_size);
+	fread(data.data, sizeof(int8_t), data.data_subchunk_size, fptr);
+
 	// close file
 	if (fclose(fptr) != 0) {
 		perror("error");
